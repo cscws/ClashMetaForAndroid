@@ -8,8 +8,11 @@ import com.github.kr328.clash.common.log.Log
 import com.github.kr328.clash.remote.Remote
 import com.github.kr328.clash.service.util.sendServiceRecreated
 import com.github.kr328.clash.util.clashDir
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import java.io.File
 import java.io.FileOutputStream
+import java.util.concurrent.TimeUnit
 
 @Suppress("unused")
 class MainApplication : Application() {
@@ -24,13 +27,19 @@ class MainApplication : Application() {
         super.onCreate()
 
         val processName = currentProcessName
-        extractGeoFiles()
 
         Log.d("Process $processName started")
 
         if (processName == packageName) {
+            // The service process re-runs extraction synchronously before the core
+            // needs the files, so the UI process must not pay for the copy (tens of
+            // MB on first launch after install/upgrade) on the main thread.
+            Global.launch(Dispatchers.IO) { extractGeoFiles() }
+
             Remote.launch()
         } else {
+            extractGeoFiles()
+
             sendServiceRecreated()
         }
     }
@@ -39,48 +48,46 @@ class MainApplication : Application() {
         clashDir.mkdirs()
 
         val updateDate = packageManager.getPackageInfo(packageName, 0).lastUpdateTime
-        val geoipFile = File(clashDir, "geoip.metadb")
-        if (geoipFile.exists() && geoipFile.lastModified() < updateDate) {
-            geoipFile.delete()
-        }
-        if (!geoipFile.exists()) {
-            FileOutputStream(geoipFile).use {
-                assets.open("geoip.metadb").copyTo(it)
-            }
-        }
 
-        val geositeFile = File(clashDir, "geosite.dat")
-        if (geositeFile.exists() && geositeFile.lastModified() < updateDate) {
-            geositeFile.delete()
-        }
-        if (!geositeFile.exists()) {
-            FileOutputStream(geositeFile).use {
-                assets.open("geosite.dat").copyTo(it)
-            }
-        }
+        // Only reap temp files that are clearly stale: another process may be
+        // extracting right now, and deleting its live temp would break its rename.
+        val staleBefore = System.currentTimeMillis() - TimeUnit.HOURS.toMillis(1)
+        clashDir.listFiles { f -> f.name.endsWith(".tmp") && f.lastModified() < staleBefore }
+            ?.forEach { it.delete() }
 
-        val asnFile = File(clashDir, "ASN.mmdb")
-        if (asnFile.exists() && asnFile.lastModified() < updateDate) {
-            asnFile.delete()
-        }
-        if (!asnFile.exists()) {
-            FileOutputStream(asnFile).use {
-                assets.open("ASN.mmdb").copyTo(it)
+        for (name in GEO_ASSETS) {
+            val target = File(clashDir, name)
+            if (target.exists() && target.lastModified() >= updateDate) {
+                continue
             }
-        }
 
-        val bundleMRSFile = File(clashDir, "BundleMRS.7z")
-        if (bundleMRSFile.exists() && bundleMRSFile.lastModified() < updateDate) {
-            bundleMRSFile.delete()
-        }
-        if (!bundleMRSFile.exists()) {
-            FileOutputStream(bundleMRSFile).use {
-                assets.open("BundleMRS.7z").copyTo(it)
+            // The UI and service processes may extract concurrently on cold start:
+            // write to a per-process temp file and rename into place atomically.
+            val temp = File(clashDir, "$name.${android.os.Process.myPid()}.tmp")
+            try {
+                FileOutputStream(temp).use { output ->
+                    assets.open(name).use { it.copyTo(output) }
+                }
+
+                if (!temp.renameTo(target)) {
+                    target.delete()
+
+                    if (!temp.renameTo(target) && !target.exists()) {
+                        Log.w("Unable to extract $name to $target")
+                    }
+                }
+            } finally {
+                temp.delete()
             }
         }
     }
 
     fun finalize() {
         Global.destroy()
+    }
+
+    companion object {
+        private val GEO_ASSETS =
+            listOf("geoip.metadb", "geosite.dat", "ASN.mmdb", "BundleMRS.7z")
     }
 }
