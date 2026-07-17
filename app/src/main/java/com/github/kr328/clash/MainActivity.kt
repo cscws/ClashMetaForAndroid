@@ -79,7 +79,10 @@ class MainActivity : BaseActivity<MainDesign>() {
                             design.showAbout(queryAppVersionName())
                     }
                 }
-                if (clashRunning) {
+                // Poll traffic only while the activity is visible: the loop lives in
+                // MainScope (cancelled at onDestroy), so without this guard it keeps
+                // issuing one IPC per second while the app is in the background.
+                if (clashRunning && activityStarted) {
                     ticker.onReceive {
                         design.fetchTraffic()
                     }
