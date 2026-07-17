@@ -43,6 +43,8 @@ class DynamicNotificationModule(service: Service) : Module<Unit>(service) {
 
     private val notificationManager = NotificationManagerCompat.from(service)
 
+    private var lastContent: String? = null
+
     private fun update() {
         val now = Clash.queryTrafficNow()
         val total = Clash.queryTrafficTotal()
@@ -51,6 +53,14 @@ class DynamicNotificationModule(service: Service) : Module<Unit>(service) {
         val downloading = now.trafficDownload()
         val uploaded = total.trafficUpload()
         val downloaded = total.trafficDownload()
+
+        // The formatted strings are constant while the tunnel is idle; skip the
+        // per-second binder call to system_server (and the SystemUI redraw)
+        // when nothing visible changed.
+        val content = "$uploading|$downloading|$uploaded|$downloaded"
+        if (content == lastContent)
+            return
+        lastContent = content
 
         val notification = builder
             .setContentText(
@@ -96,6 +106,8 @@ class DynamicNotificationModule(service: Service) : Module<Unit>(service) {
                 }
                 profileLoaded.onReceive {
                     builder.setContentTitle(StatusProvider.currentProfile ?: "Not selected")
+
+                    lastContent = null
                 }
                 if (shouldUpdate) {
                     ticker.onReceive {
