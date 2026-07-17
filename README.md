@@ -2,6 +2,26 @@
 
 A Graphical user interface of [Clash.Meta](https://github.com/MetaCubeX/Clash.Meta) for Android
 
+### 关于此 Fork / About this fork
+
+本仓库是 [MetaCubeX/ClashMetaForAndroid](https://github.com/MetaCubeX/ClashMetaForAndroid) 的**独立维护分支**,携带一批性能、稳定性与耗电修复,**不计划合并回上游**。
+This is an **independently maintained fork** of CMFA carrying performance, stability and battery fixes. It is **not** intended to be merged back upstream.
+
+**改动摘要 / What's changed** (branch `fix/leaks-anr-build-hygiene`):
+
+- 修复广播接收器重复注册且永不注销的问题(每次前后台切换后,状态事件被成倍重复处理)
+- 修复两处原生层资源泄漏:单组延迟测试泄漏 JNI GlobalRef;日志页退订协议失效导致每次开关日志都永久泄漏一条转发 goroutine
+- 修复服务进程死亡瞬间可能崩溃 UI 进程的窗口(跨进程首跳未纳入重试循环)
+- 安装/升级后的首次启动不再于主线程解压几十 MB geo 资源(消除白屏与 ANR 风险),并发解压原子化
+- 耗电:退后台即停每秒流量轮询;通知内容未变化时不再每秒重发;拆除亮灭屏的空转唤醒链路;被禁用级别的核心日志不再跨 cgo 转发
+- 构建:geo 文件增量下载(不再每次构建全量重下)、移除无用的 Jetifier、启用 Gradle 构建缓存、CMake 版本探测对浅克隆子模块健壮化
+
+**下载 / Download:** 见 [Releases](https://github.com/cscws/ClashMetaForAndroid/releases)。
+
+> [!IMPORTANT]
+> 本仓库发布的 APK 为本地构建、debug 签名,与上游官方发布的签名不同:**无法覆盖安装官方版本**,需先卸载官方版再安装(反之亦然)。
+> Release APKs here are built locally with a debug signature, which differs from the official upstream signature: they **cannot be installed over official builds** — uninstall first (and vice versa).
+
 ### Feature
 
 Feature of [Clash.Meta](https://github.com/MetaCubeX/Clash.Meta)
