@@ -44,15 +44,33 @@ task("downloadGeoFiles") {
         "https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/BundleMRS.7z" to "BundleMRS.7z",
     )
 
+    // The URLs point at the floating "latest" release, so an existing file can
+    // never be proven up-to-date; skip re-downloading and let `clean` refresh.
+    outputs.files(geoFilesUrls.values.map { file("$geoFilesDownloadDir/$it") })
+    outputs.upToDateWhen { task -> task.outputs.files.all { it.exists() } }
+
     doLast {
         geoFilesUrls.forEach { (downloadUrl, outputFileName) ->
-            val url = URL(downloadUrl)
             val outputPath = file("$geoFilesDownloadDir/$outputFileName")
-            outputPath.parentFile.mkdirs()
-            url.openStream().use { input ->
-                Files.copy(input, outputPath.toPath(), StandardCopyOption.REPLACE_EXISTING)
-                println("$outputFileName downloaded to $outputPath")
+            if (outputPath.exists()) {
+                return@forEach
             }
+            outputPath.parentFile.mkdirs()
+
+            // Download via a temp file and move atomically so an interrupted
+            // build can never leave a truncated file that "exists" and is
+            // then skipped by the checks above.
+            val partPath = file("$geoFilesDownloadDir/$outputFileName.part")
+            URL(downloadUrl).openStream().use { input ->
+                Files.copy(input, partPath.toPath(), StandardCopyOption.REPLACE_EXISTING)
+            }
+            Files.move(
+                partPath.toPath(),
+                outputPath.toPath(),
+                StandardCopyOption.ATOMIC_MOVE,
+                StandardCopyOption.REPLACE_EXISTING,
+            )
+            println("$outputFileName downloaded to $outputPath")
         }
     }
 }
@@ -61,7 +79,11 @@ afterEvaluate {
     val downloadGeoFilesTask = tasks["downloadGeoFiles"]
 
     tasks.forEach {
-        if (it.name.startsWith("assemble")) {
+        // mergeAssets consumes this task's declared outputs, so it needs an
+        // explicit dependency too or Gradle 8 fails validation.
+        if (it.name.startsWith("assemble") ||
+            (it.name.startsWith("merge") && it.name.endsWith("Assets"))
+        ) {
             it.dependsOn(downloadGeoFilesTask)
         }
     }

@@ -10,8 +10,9 @@ execute_process(
 )
 string(REPLACE "\n" ";" COMMIT_HASH "${COMMIT_HASH}")
 list(GET COMMIT_HASH 1 COMMIT_HASH)
-string (REGEX REPLACE "[\n\t\r]" "" COMMIT_HASH ${COMMIT_HASH})
-string(SUBSTRING ${COMMIT_HASH} 0 7 COMMIT_HASH)
+# 变量必须加引号：值为空时未加引号的展开会让 string() 缺参而直接报错
+string (REGEX REPLACE "[\n\t\r]" "" COMMIT_HASH "${COMMIT_HASH}")
+string(SUBSTRING "${COMMIT_HASH}" 0 7 COMMIT_HASH)
 message(STATUS "git hash= ${COMMIT_HASH}")
 
 # 获取分支名称
@@ -22,8 +23,9 @@ execute_process(
 )
 string(REPLACE "\n" ";" CURRENT_BRANCH "${CURRENT_BRANCH}")
 list(GET CURRENT_BRANCH 1 CURRENT_BRANCH)
-string (REGEX REPLACE "origin/" "" CURRENT_BRANCH ${CURRENT_BRANCH})
-string (REGEX REPLACE "[\n\t\r]" "" CURRENT_BRANCH ${CURRENT_BRANCH})
+# 浅克隆的 submodule 没有远程分支引用，CURRENT_BRANCH 可能为空，同样必须加引号
+string (REGEX REPLACE "origin/" "" CURRENT_BRANCH "${CURRENT_BRANCH}")
+string (REGEX REPLACE "[\n\t\r]" "" CURRENT_BRANCH "${CURRENT_BRANCH}")
 #string(SUBSTRING ${CURRENT_BRANCH} 0 8 CURRENT_BRANCH)
 message(STATUS "git current branch = ${CURRENT_BRANCH}")
 
