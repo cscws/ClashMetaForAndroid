@@ -23,6 +23,13 @@ func init() {
 		defer log.UnSubscribe(sub)
 
 		for msg := range sub {
+			// Subscription delivers every event regardless of the configured
+			// level; filter before paying for the CString + cgo round trip,
+			// mirroring subscribeLogcat below ([APP] lines always pass).
+			if msg.LogLevel < log.Level() && !strings.HasPrefix(msg.Payload, "[APP]") {
+				continue
+			}
+
 			cPayload := C.CString(msg.Payload)
 
 			switch msg.LogLevel {

@@ -42,7 +42,11 @@ func Init(home, versionName, gitVersion string, platformVersion int) {
 		uid := app.QuerySocketUid(metadata.RawSrcAddr, metadata.RawDstAddr)
 		pkg := app.QueryAppByUid(uid)
 
-		log.Debugln("[PKG] %s --> %s by %d[%s]", metadata.SourceAddress(), metadata.RemoteAddress(), uid, pkg)
+		// This resolver runs once per connection; don't build the address
+		// strings unless debug logging is actually enabled.
+		if log.Level() <= log.DEBUG {
+			log.Debugln("[PKG] %s --> %s by %d[%s]", metadata.SourceAddress(), metadata.RemoteAddress(), uid, pkg)
+		}
 
 		return pkg, nil
 	}
