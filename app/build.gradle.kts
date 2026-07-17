@@ -32,26 +32,25 @@ tasks.getByName("clean", type = Delete::class) {
     delete(file("release"))
 }
 
-val geoFilesDownloadDir = "src/main/assets"
+abstract class DownloadGeoFilesTask : DefaultTask() {
+    @get:OutputDirectory
+    abstract val outputDir: DirectoryProperty
 
-task("downloadGeoFiles") {
+    @TaskAction
+    fun download() {
+        val geoFilesUrls = mapOf(
+            "https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/geoip.metadb" to "geoip.metadb",
+            "https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/geosite.dat" to "geosite.dat",
+            // "https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/country.mmdb" to "country.mmdb",
+            "https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/GeoLite2-ASN.mmdb" to "ASN.mmdb",
+            "https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/BundleMRS.7z" to "BundleMRS.7z",
+        )
 
-    val geoFilesUrls = mapOf(
-        "https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/geoip.metadb" to "geoip.metadb",
-        "https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/geosite.dat" to "geosite.dat",
-        // "https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/country.mmdb" to "country.mmdb",
-        "https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/GeoLite2-ASN.mmdb" to "ASN.mmdb",
-        "https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/BundleMRS.7z" to "BundleMRS.7z",
-    )
-
-    // The URLs point at the floating "latest" release, so an existing file can
-    // never be proven up-to-date; skip re-downloading and let `clean` refresh.
-    outputs.files(geoFilesUrls.values.map { file("$geoFilesDownloadDir/$it") })
-    outputs.upToDateWhen { task -> task.outputs.files.all { it.exists() } }
-
-    doLast {
+        // The URLs point at the floating "latest" release, so an existing file
+        // can never be proven outdated; download only what is missing and let
+        // `clean` force a refresh.
         geoFilesUrls.forEach { (downloadUrl, outputFileName) ->
-            val outputPath = file("$geoFilesDownloadDir/$outputFileName")
+            val outputPath = outputDir.get().file(outputFileName).asFile
             if (outputPath.exists()) {
                 return@forEach
             }
@@ -59,8 +58,8 @@ task("downloadGeoFiles") {
 
             // Download via a temp file and move atomically so an interrupted
             // build can never leave a truncated file that "exists" and is
-            // then skipped by the checks above.
-            val partPath = file("$geoFilesDownloadDir/$outputFileName.part")
+            // then skipped by the check above.
+            val partPath = outputDir.get().file("$outputFileName.part").asFile
             URL(downloadUrl).openStream().use { input ->
                 Files.copy(input, partPath.toPath(), StandardCopyOption.REPLACE_EXISTING)
             }
@@ -70,25 +69,23 @@ task("downloadGeoFiles") {
                 StandardCopyOption.ATOMIC_MOVE,
                 StandardCopyOption.REPLACE_EXISTING,
             )
-            println("$outputFileName downloaded to $outputPath")
+            logger.lifecycle("$outputFileName downloaded to $outputPath")
         }
     }
 }
 
-afterEvaluate {
-    val downloadGeoFilesTask = tasks["downloadGeoFiles"]
-
-    tasks.forEach {
-        // mergeAssets consumes this task's declared outputs, so it needs an
-        // explicit dependency too or Gradle 8 fails validation.
-        if (it.name.startsWith("assemble") ||
-            (it.name.startsWith("merge") && it.name.endsWith("Assets"))
-        ) {
-            it.dependsOn(downloadGeoFilesTask)
-        }
-    }
+val downloadGeoFiles = tasks.register<DownloadGeoFilesTask>("downloadGeoFiles") {
+    outputDir.set(layout.buildDirectory.dir("generated/geoAssets"))
 }
 
-tasks.getByName("clean", type = Delete::class) {
-    delete(file(geoFilesDownloadDir))
+// addGeneratedSourceDirectory wires the task dependency into every consumer of
+// the assets (mergeAssets, lint model writers, ...) automatically, and keeps
+// the downloads under build/ where clean already removes them.
+androidComponents {
+    onVariants { variant ->
+        variant.sources.assets?.addGeneratedSourceDirectory(
+            downloadGeoFiles,
+            DownloadGeoFilesTask::outputDir,
+        )
+    }
 }
