@@ -222,7 +222,17 @@ object Clash {
         return Channel<LogMessage>(32).apply {
             Bridge.nativeSubscribeLogcat(object : LogcatInterface {
                 override fun received(jsonPayload: String) {
-                    trySend(Json.decodeFromString(LogMessage.serializer(), jsonPayload))
+                    // Throwing here is the unsubscribe protocol: the native side
+                    // only stops forwarding and releases its global ref when this
+                    // callback raises an exception. trySend on a closed channel
+                    // returns a failure instead of throwing (unlike the original
+                    // offer()), so surface it explicitly. A full buffer just drops.
+                    if (trySend(
+                            Json.decodeFromString(LogMessage.serializer(), jsonPayload)
+                        ).isClosed
+                    ) {
+                        throw IllegalStateException("logcat subscriber closed")
+                    }
                 }
             })
         }
