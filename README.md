@@ -4,8 +4,8 @@ A Graphical user interface of [Clash.Meta](https://github.com/MetaCubeX/Clash.Me
 
 ### 关于此 Fork / About this fork
 
-本仓库是 [MetaCubeX/ClashMetaForAndroid](https://github.com/MetaCubeX/ClashMetaForAndroid) 的**独立维护分支**,携带一批性能、稳定性与耗电修复,**不计划合并回上游**。
-This is an **independently maintained fork** of CMFA carrying performance, stability and battery fixes. It is **not** intended to be merged back upstream.
+本仓库是 [MetaCubeX/ClashMetaForAndroid](https://github.com/MetaCubeX/ClashMetaForAndroid) 的**独立维护分支**,携带一批性能、稳定性与耗电修复。本 fork 的改动**仅在此仓库独立维护,不会向原项目(上游)提交 PR,也不会以任何形式回馈、贡献或合并回上游**。
+This is an **independently maintained fork** of CMFA carrying performance, stability and battery fixes. These changes are **maintained solely in this repository and will not be submitted upstream as pull requests, nor contributed or merged back to the original project in any form**.
 
 **改动摘要 / What's changed** (branch `fix/leaks-anr-build-hygiene`):
 
@@ -16,7 +16,7 @@ This is an **independently maintained fork** of CMFA carrying performance, stabi
 - 耗电:退后台即停每秒流量轮询;通知内容未变化时不再每秒重发;拆除亮灭屏的空转唤醒链路;被禁用级别的核心日志不再跨 cgo 转发
 - 构建:geo 文件增量下载(不再每次构建全量重下)、移除无用的 Jetifier、启用 Gradle 构建缓存、CMake 版本探测对浅克隆子模块健壮化
 
-**下载 / Download:** [cmfa-2.11.31-meta-arm64-v8a-release.apk](https://github.com/cscws/ClashMetaForAndroid/raw/fix/leaks-anr-build-hygiene/download/cmfa-2.11.31-meta-arm64-v8a-release.apk)(arm64,适配绝大多数手机 / fits most phones。其它 ABI 请按下文 Build 章节自行构建 / build other ABIs yourself)。
+**下载 / Download:** [cmfa-2.11.31-meta-arm64-v8a-release.apk](https://github.com/cscws/ClashMetaForAndroid/raw/main/download/cmfa-2.11.31-meta-arm64-v8a-release.apk)(arm64,适配绝大多数手机 / fits most phones。其它 ABI 请按下文 Build 章节自行构建 / build other ABIs yourself)。
 
 > [!IMPORTANT]
 > 本仓库发布的 APK 为本地构建、debug 签名,与上游官方发布的签名不同:**无法覆盖安装官方版本**,需先卸载官方版再安装(反之亦然)。
